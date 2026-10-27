@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.global_jobs import router as global_jobs_router
 
-app = FastAPI(title="AI Job Application Tracker API", version="0.1.0")
+app = FastAPI(title="AI Job Application Tracker API", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -10,6 +11,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(global_jobs_router)
 
 @app.get("/")
 def root():
