@@ -37,6 +37,54 @@ function App() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [resumeText, setResumeText] = useState('');
+  const [reviewQueue, setReviewQueue] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('job_review_queue') || '[]'); } catch { return []; }
+  });
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installHelp, setInstallHelp] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('job_review_queue', JSON.stringify(reviewQueue));
+  }, [reviewQueue]);
+
+  useEffect(() => {
+    const onInstall = event => { event.preventDefault(); setInstallPrompt(event); };
+    const onInstalled = () => { setInstallPrompt(null); setNotice('Pathfinder is installed on this device.'); setInstallHelp(false); };
+    window.addEventListener('beforeinstallprompt', onInstall);
+    window.addEventListener('appinstalled', onInstalled);
+    if ('serviceWorker' in navigator && import.meta.env.PROD) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}), { once: true });
+    }
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onInstall);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  function addToReview(job) {
+    setReviewQueue(current => current.some(item => item.id === job.id && item.apply_url === job.apply_url)
+      ? current
+      : [{ ...job, review_status: 'Needs review', queued_at: new Date().toISOString() }, ...current]);
+    setNotice('Job added to your review queue. Review it before opening the application link.');
+  }
+
+  function updateReview(job, status) {
+    setReviewQueue(current => current.map(item =>
+      item.id === job.id && item.apply_url === job.apply_url ? { ...item, review_status: status } : item
+    ));
+  }
+
+  function removeFromReview(job) {
+    setReviewQueue(current => current.filter(item => !(item.id === job.id && item.apply_url === job.apply_url)));
+  }
+
+  async function installApp() {
+    if (!installPrompt) { setInstallHelp(true); return; }
+    await installPrompt.prompt();
+    const result = await installPrompt.userChoice;
+    if (result?.outcome === 'accepted') setNotice('Installation accepted. Follow your browser prompts to finish.');
+    setInstallPrompt(null);
+  }
 
   const setField = (key, value) => setFilters(current => ({ ...current, [key]: value, page: 1 }));
 
@@ -125,7 +173,7 @@ function App() {
     <div className="site-shell">
       <header className="topbar">
         <a className="brand" href="#"><span className="brand-icon">✳</span><span>Pathfinder<span className="brand-muted">.jobs</span></span></a>
-        <div className="top-actions"><span className="global-pill"><span className="live-dot"/> Worldwide search</span>{member ? <><span className="member-email">{member.email}</span><button className="button button-quiet button-small" onClick={logout}>Sign out</button></> : <span className="member-email">Free member accounts</span>}</div>
+        <div className="top-actions"><button className="install-button" onClick={installApp} aria-label="Install Pathfinder app">{installPrompt ? '＋ Install app' : '＋ App'}</button><span className="global-pill"><span className="live-dot"/> Worldwide search</span>{member ? <><span className="member-email">{member.email}</span><button className="button button-quiet button-small" onClick={logout}>Sign out</button></> : <span className="member-email">Free member accounts</span>}</div>
       </header>
 
       <main>
@@ -146,6 +194,8 @@ function App() {
             <div className="auth-fields"><input aria-label="Email" type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} required/><input aria-label="Password" type="password" placeholder="Password (8+ characters)" value={password} onChange={e => setPassword(e.target.value)} minLength={8} required/><button className="button button-dark" disabled={authLoading}>{authLoading ? 'Please wait…' : authMode === 'register' ? 'Join for free ↗' : 'Sign in ↗'}</button></div>
           </form>
         </section>}
+
+        {installHelp && <div className="install-help" role="status"><b>Install Pathfinder</b><span>On desktop, use the install icon in your browser address bar or open the browser menu and choose “Install app” / “Add to Home screen”. On iPhone, use Share → Add to Home Screen in Safari.</span><button className="delete-button" onClick={() => setInstallHelp(false)} aria-label="Close install help">×</button></div>}
 
         <section className="search-section" id="search">
           <div className="section-heading"><div><div className="eyebrow">SMART JOB DISCOVERY</div><h2>Build your search</h2><p>Set your preferences once. Search results link back to the original job posting.</p></div><div className="step-tag"><span>01</span> Search preferences</div></div>
@@ -170,10 +220,24 @@ function App() {
           {jobs.length > 0 && <div className="save-search-bar"><div><b>Want to run this search again?</b><span>Save these filters to your member account.</span></div><input value={savedName} onChange={e => setSavedName(e.target.value)} aria-label="Saved search name"/><button className="button button-outline" onClick={saveCurrentSearch} disabled={!member}>＋ Save search</button>{!member && <small>Create an account above to save.</small>}</div>}
           {loading && <div className="loading-state"><span className="spinner spinner-dark"/><b>Looking across connected job sources…</b><span>Matching your location and experience preferences.</span></div>}
           {!loading && jobs.length > 0 && <div className="job-list">{jobs.map((job, i) => <article className="job-card" key={job.id || job.apply_url || i}>
-            <div className="company-avatar">{(job.company || 'J').trim().slice(0,1).toUpperCase()}</div><div className="job-main"><div className="job-topline"><h3>{job.title}</h3>{job.match_score > 0 && <span className="match-badge">{job.match_score}% resume match</span>}</div><div className="company-name">{job.company}</div><div className="job-meta"><span>⌖ {job.location || 'Location not specified'}</span><span>◷ {job.employment_type || 'Type not specified'}</span><span>◉ {job.seniority || 'Experience not specified'}</span></div><p className="job-description">{(job.summary || '').replace(/<[^>]*>/g, ' ').slice(0, 230)}{(job.summary || '').length > 230 ? '…' : ''}</p><div className="job-foot"><span className="source-label">Source: {job.source}</span><span className="salary-label">{job.salary && job.salary !== 'Not disclosed' ? job.salary : 'Salary not disclosed'}</span></div></div><div className="job-apply">{job.apply_url && <a className="button button-dark" href={job.apply_url} target="_blank" rel="noopener noreferrer">View & apply ↗</a>}{job.source_url && <a className="source-link" href={job.source_url} target="_blank" rel="noopener noreferrer">About source ↗</a>}</div>
+            <div className="company-avatar">{(job.company || 'J').trim().slice(0,1).toUpperCase()}</div><div className="job-main"><div className="job-topline"><h3>{job.title}</h3>{job.match_score > 0 && <span className="match-badge">{job.match_score}% resume match</span>}</div><div className="company-name">{job.company}</div><div className="job-meta"><span>⌖ {job.location || 'Location not specified'}</span><span>◷ {job.employment_type || 'Type not specified'}</span><span>◉ {job.seniority || 'Experience not specified'}</span></div><p className="job-description">{(job.summary || '').replace(/<[^>]*>/g, ' ').slice(0, 230)}{(job.summary || '').length > 230 ? '…' : ''}</p><div className="job-foot"><span className="source-label">Source: {job.source}</span><span className="salary-label">{job.salary && job.salary !== 'Not disclosed' ? job.salary : 'Salary not disclosed'}</span></div></div><div className="job-apply"><button className="button button-review" onClick={() => addToReview(job)}>{reviewQueue.some(item => item.id === job.id && item.apply_url === job.apply_url) ? '✓ In review queue' : '＋ Review first'}</button>{job.source_url && <a className="source-link" href={job.source_url} target="_blank" rel="noopener noreferrer">About source ↗</a>}</div>
           </article>)}</div>}
           {!loading && jobs.length > 0 && <div className="pagination"><span>Page {page} · {jobs.length} listings shown</span><div><button className="button button-outline" disabled={page <= 1 || loading} onClick={() => searchJobs(page - 1)}>← Previous</button><button className="button button-outline" disabled={!hasMore || loading} onClick={() => searchJobs(page + 1)}>Next page →</button></div></div>}
           {!loading && jobs.length === 0 && <div className="empty-state"><div className="empty-icon">⌕</div><b>Your next opportunity is out there.</b><span>Choose your filters and search to discover roles from connected job sources.</span><button className="button button-outline" onClick={() => { setFilters(DEFAULTS); setLocationText(DEFAULTS.locations.join(', ')); setResumeText(''); }}>Reset to suggested search</button></div>}
+        </section>
+
+        <section className="review-section" id="review">
+          <div className="saved-header"><div><div className="eyebrow">HUMAN-IN-THE-LOOP WORKFLOW</div><h2>Review before applying</h2><p>Nothing is submitted automatically. Check each listing, approve it, then open the employer's application page yourself.</p></div><span className="saved-count">{reviewQueue.length} in queue</span></div>
+          {reviewQueue.length === 0 ? <div className="saved-empty">Your review queue is empty. Find jobs and select “Review first” on a listing to add it here.</div> :
+            <div className="review-list">{reviewQueue.map((job, index) => <article className="review-card" key={(job.id || job.apply_url || job.title) + '-' + index}>
+              <div className="review-status">{job.review_status === 'Approved' ? '✓' : '○'}</div>
+              <div className="review-info"><b>{job.title}</b><span>{job.company} · {job.location || 'Location not specified'}</span><small>{job.match_score > 0 ? job.match_score + '% resume match · ' : ''}{job.source} · {job.review_status}</small></div>
+              <div className="review-actions">
+                {job.review_status !== 'Approved' && <button className="button button-outline button-small" onClick={() => updateReview(job, 'Approved')}>Approve</button>}
+                {job.review_status === 'Approved' && <a className="button button-dark button-small" href={job.apply_url} target="_blank" rel="noopener noreferrer" onClick={() => updateReview(job, 'Application page opened')}>Open application ↗</a>}
+                <button className="button button-quiet button-small" onClick={() => removeFromReview(job)}>Remove</button>
+              </div>
+            </article>)}</div>}
         </section>
 
         <section className="saved-section"><div className="saved-header"><div><div className="eyebrow">YOUR PERSONAL SHORTCUTS</div><h2>Saved searches</h2><p>Private to your account. Pick up where you left off.</p></div><span className="saved-count">{saved.length} saved</span></div>{!member ? <div className="saved-empty">Sign in or create a free account to save and revisit your searches.</div> : saved.length === 0 ? <div className="saved-empty">No saved searches yet. Run a search, then select “Save search”.</div> : <div className="saved-grid">{saved.map(item => <article className="saved-card" key={item.id}><div className="saved-card-icon">↗</div><div className="saved-card-content"><b>{item.name}</b><span>{item.filters.keyword} · {item.filters.country}</span><small>{(item.filters.locations || []).join(', ') || 'Any location'} · {item.filters.experience}</small></div><button className="button button-outline button-small" onClick={() => restoreSearch(item)}>Restore</button><button className="delete-button" title="Delete saved search" aria-label={'Delete ' + item.name} onClick={() => deleteSaved(item.id)}>×</button></article>)}</div>}</section>
