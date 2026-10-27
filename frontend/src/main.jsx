@@ -132,6 +132,12 @@ function App() {
   }
 
   async function searchJobs(nextPage = 1) {
+    if (!member) {
+      setError('');
+      setNotice('Create a free account or sign in above to search jobs and manage your review queue.');
+      document.querySelector('.auth-banner')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setLoading(true); setError(''); setNotice(''); setWarnings([]);
     const locations = locationText.split(',').map(x => x.trim()).filter(Boolean);
     const payload = { ...filters, locations, page: nextPage, resume_text: resumeText };
