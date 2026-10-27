@@ -9,6 +9,9 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
