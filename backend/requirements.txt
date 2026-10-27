@@ -7,3 +7,4 @@ python-jose[cryptography]
 passlib[bcrypt]
 sqlalchemy
 psycopg2-binary
+httpx
