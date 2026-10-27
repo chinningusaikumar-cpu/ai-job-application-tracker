@@ -293,9 +293,9 @@ async def search_jobs(payload: SearchRequest, member: Member = Depends(current_m
         filtered.append(job)
     if payload.resume_text.strip():
         filtered.sort(key=lambda x: x["match_score"], reverse=True)
-    start = (payload.page - 1) * payload.page_size
-    result_jobs = filtered[start:start + payload.page_size]
-    return {"jobs": result_jobs, "page": payload.page, "page_size": payload.page_size, "has_more": len(filtered) >= payload.page_size, "count": len(result_jobs), "sources": sorted({x["source"] for x in result_jobs}), "warnings": warnings, "note": "Himalayas is remote-focused. Adzuna local/country listings require ADZUNA_APP_ID and ADZUNA_APP_KEY."}
+    # Each upstream source already receives the requested page number. Do not slice a second time.
+    result_jobs = filtered[:payload.page_size]
+    return {"jobs": result_jobs, "page": payload.page, "page_size": payload.page_size, "has_more": len(jobs) >= payload.page_size, "count": len(result_jobs), "sources": sorted({x["source"] for x in result_jobs}), "warnings": warnings, "note": "Himalayas is remote-focused. Adzuna local/country listings require ADZUNA_APP_ID and ADZUNA_APP_KEY."}
 
 
 @router.post("/api/saved-searches")
