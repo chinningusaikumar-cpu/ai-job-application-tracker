@@ -74,3 +74,20 @@ Also test `POST /api/saved-searches` and `GET /api/saved-searches`. Register a s
 ## Before deployment
 
 Set a strong `JWT_SECRET`, configure PostgreSQL through `DATABASE_URL`, enable HTTPS, restrict CORS to your real website, add email verification/password reset, rate-limit authentication, and use database migrations. Keep `.env` secrets out of GitHub. Resume text is used for match scoring; avoid saving sensitive personal information in saved searches. Follow each job source's API terms, attribution rules, and expiration policies.
+
+## App-style UI and installable PWA
+
+The React frontend uses a responsive green-and-cream layout for mobile and desktop. Members can search connected job sources, score results against pasted resume text, save searches, and add roles to a local review queue. A role must be marked **Approved** before the UI opens its employer application page. The app does not submit applications automatically.
+
+PWA files:
+- `frontend/public/manifest.webmanifest` — app name, theme, install metadata
+- `frontend/public/icon.svg` — app icon
+- `frontend/public/sw.js` — caches the app shell and same-origin static assets for offline loading
+
+Installability requires HTTPS on a deployed website (localhost works for development). After the production build is deployed, open the site in a supported browser and choose **Install app** or **Add to Home Screen**. The review queue is currently stored in that browser/device; saved searches remain attached to the signed-in member account.
+
+Production build check (run inside `frontend`):
+```powershell
+npm run build
+npm run preview
+```
