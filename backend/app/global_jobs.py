@@ -252,8 +252,17 @@ async def search_jobs(payload: SearchRequest, member: Member = Depends(current_m
     app_id, app_key = os.getenv("ADZUNA_APP_ID"), os.getenv("ADZUNA_APP_KEY")
     if app_id and app_key:
         locations = [x.strip() for x in payload.locations if x.strip()]
+        country_codes = {
+            "india": "in", "united states": "us", "usa": "us", "united kingdom": "gb",
+            "uk": "gb", "canada": "ca", "australia": "au", "germany": "de",
+            "united arab emirates": "ae", "singapore": "sg",
+        }
         country = payload.country.lower()
-        codes = ["in"] if locations or country == "india" else (["us", "gb", "ca", "au", "de", "in"] if country == "worldwide" else [])
+        if country == "worldwide":
+            # Supplied city defaults are Indian; worldwide remote roles come from Himalayas.
+            codes = ["in"] if locations else ["us", "gb", "ca", "au", "de", "in"]
+        else:
+            codes = [country_codes[country]] if country in country_codes else []
         import asyncio
         async with httpx.AsyncClient(timeout=12, headers=headers, follow_redirects=True) as client:
             reqs = []
@@ -277,9 +286,11 @@ async def search_jobs(payload: SearchRequest, member: Member = Depends(current_m
         if locations and payload.workplace != "Remote" and not any(x in place or x in searchable for x in locations):
             if not (payload.country == "Worldwide" and ("worldwide" in place or place == "remote / worldwide")):
                 continue
-        if payload.workplace == "On-site" and any(x in searchable for x in ("remote", "work from anywhere")):
+        if payload.workplace == "On-site" and any(x in searchable for x in ("remote", "work from anywhere", "hybrid")):
             continue
         if payload.workplace == "Remote" and not any(x in searchable for x in ("remote", "worldwide", "anywhere")):
+            continue
+        if payload.workplace == "Hybrid" and "hybrid" not in searchable:
             continue
         if payload.employment_type != "Any":
             wanted = payload.employment_type.lower().replace("-", " ")
