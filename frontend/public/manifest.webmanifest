@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "Pathfinder.jobs — AI Job Application Tracker",
+  "short_name": "Pathfinder",
+  "description": "Find jobs, match your skills, and review each opportunity before applying.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f4e9",
+  "theme_color": "#24432e",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
